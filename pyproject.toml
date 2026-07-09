@@ -1,7 +1,47 @@
 [project]
 name = "cv2"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.14"
-dependencies = []
+description = "CNN encoder/decoder architectures"
+requires-python = ">=3.11"
+dependencies = [
+    # Deep learning core
+    "torch>=2.3.0",
+    "torchvision>=0.18.0",
+    "torchaudio>=2.3.0",
+    # Data handling
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "opencv-python-headless>=4.9",
+    # Training utilities
+    "tqdm>=4.66",
+    "tensorboard>=2.16",
+    # Config & experiment tracking
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    # Visualisation
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    # Linting / formatting
+    "ruff>=0.4",
+]
+ 
+[tool.uv]
+# Pull CUDA-enabled torch wheels from the PyTorch index
+index-strategy = "unsafe-best-match"
+ 
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+ 
+[tool.uv.sources]
+torch      = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+torchaudio  = { index = "pytorch-cu128" }
+ 
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+ 
+[tool.ruff.lint]
+select = ["E", "F", "I"]
