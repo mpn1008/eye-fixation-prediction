@@ -1,9 +1,3 @@
-"""Training entry point for the fixation prediction model.
-
-Usage (from repo root):
-    python -m src.fixation.train
-"""
-
 import argparse
 from pathlib import Path
 from datetime import datetime
@@ -131,7 +125,8 @@ def main(cfg: Config) -> None:
     )
     scheduler = CosineAnnealingLR(optimiser, T_max=cfg.train.epochs, eta_min=1e-6)
 
-    best_cc = -float("inf")
+    best_val_loss = float("inf")
+    best_auc = -float("inf")
 
     for epoch in range(1, cfg.train.epochs + 1):
         print(f"\nEpoch {epoch}/{cfg.train.epochs}")
@@ -147,31 +142,30 @@ def main(cfg: Config) -> None:
             writer.add_scalar(f"val/{k}", v, epoch)
 
         cc = val_stats.get("metric/cc", -1.0)
-        kl = val_stats.get("metric/kl", -1.0)
-        nss = val_stats.get("metric/nss", -1.0)
+        val_loss = val_stats.get("loss/total", float("inf"))
+        auc_judd = val_stats.get("metric/auc_judd", -1.0)
         print(
             f"  train loss: {train_stats['loss/total']:.4f} | "
-            f"val CC: {cc:.4f}  KL: {kl:.4f}  NSS: {nss:.4f}"
+            f"val loss: {val_loss:.4f} | "
+            f"val KL: {val_stats.get('loss/kl', -1.0):.4f} | "
+            f"AUC-Judd: {auc_judd:.4f}"
         )
 
         # Save best
-        if cc > best_cc:
-            best_cc = cc
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+        if auc_judd > best_auc:
+            best_auc = auc_judd
             torch.save(
                 {"epoch": epoch, "model": model.state_dict(), "cfg": cfg},
                 cfg.train.checkpoint_dir / "best.pt",
             )
-            print(f"  ✓ saved best checkpoint (CC={cc:.4f})")
-
-        # Periodic save
-        if epoch % cfg.train.save_every == 0:
-            torch.save(
-                {"epoch": epoch, "model": model.state_dict(), "optimiser": optimiser.state_dict()},
-                cfg.train.checkpoint_dir / f"epoch_{epoch:03d}.pt",
-            )
+            print(f"  ✓ saved best checkpoint (AUC-Judd={auc_judd:.4f})")
 
     writer.close()
-    print(f"\nTraining complete. Best val CC: {best_cc:.4f}")
+    print(
+        f"\nTraining complete. Best val loss: {best_val_loss:.4f} | Best AUC-Judd: {best_auc:.4f}"
+    )
 
 
 # ---------------------------------------------------------------------------

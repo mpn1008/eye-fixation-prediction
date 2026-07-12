@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torchvision.models import ResNet50_Weights, resnet50
+from torchvision.models import ResNet101_Weights, resnet101
 
 
 @dataclass
@@ -29,6 +30,8 @@ class ResNetEncoder(nn.Module):
 
     def __init__(self, pretrained: bool = True):
         super().__init__()
+        # weights = ResNet50_Weights.DEFAULT if pretrained else None
+        # backbone = resnet50(weights=weights)
         weights = ResNet50_Weights.DEFAULT if pretrained else None
         backbone = resnet50(weights=weights)
 

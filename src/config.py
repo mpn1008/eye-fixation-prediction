@@ -16,7 +16,7 @@ class DataConfig:
 
 @dataclass
 class ModelConfig:
-    backbone: str = "resnet50"  # resnet50 | resnet34
+    backbone: str = "resnet101"
     pretrained: bool = True
     decoder_channels: list = field(default_factory=lambda: [256, 128, 64, 32])
 
@@ -30,7 +30,7 @@ class TrainConfig:
     # loss weights (kl + cc + mse)
     w_kl: float = 1.0
     w_cc: float = 1.0
-    w_mse: float = 0.5
+    w_mse: float = 0
     checkpoint_dir: Path = Path("checkpoints")
     log_dir: Path = Path("runs")
     save_every: int = 5  # save checkpoint every N epochs

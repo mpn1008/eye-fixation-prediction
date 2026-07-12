@@ -1,33 +1,12 @@
-"""
-Saliency-specific loss functions and evaluation metrics.
-
-Loss:
-    Combined = w_kl * KLDiv + w_cc * (1 - CC) + w_mse * MSE
-
-Metrics (all standard in saliency benchmarks):
-    KL  – KL divergence  (lower is better)
-    CC  – Pearson correlation coefficient  (higher is better)
-    NSS – Normalised scanpath saliency     (higher is better)
-"""
-
 import torch
 import torch.nn.functional as F
+import numpy as np
 
-_EPS = 1e-8
-
+_EPS = 1e-7
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _normalise(x: torch.Tensor) -> torch.Tensor:
-    """Per-sample min-max normalise to [0, 1], shape (B, 1, H, W)."""
-    b = x.shape[0]
-    flat = x.view(b, -1)
-    mn = flat.min(dim=1).values.view(b, 1, 1, 1)
-    mx = flat.max(dim=1).values.view(b, 1, 1, 1)
-    return (x - mn) / (mx - mn + _EPS)
 
 
 def _to_prob(x: torch.Tensor) -> torch.Tensor:
@@ -96,7 +75,7 @@ class SaliencyLoss(torch.nn.Module):
 
 @torch.no_grad()
 def compute_metrics(pred: torch.Tensor, target: torch.Tensor) -> dict[str, float]:
-    """Compute KL, CC and NSS for a batch. Returns Python floats."""
+    """Compute KL, CC and AUC-Judd for a batch. Returns Python floats."""
     b = pred.shape[0]
 
     # KL
@@ -111,13 +90,43 @@ def compute_metrics(pred: torch.Tensor, target: torch.Tensor) -> dict[str, float
     denom = (p_c.norm(dim=1) * t_c.norm(dim=1)).clamp(min=_EPS)
     cc = (num / denom).mean().item()
 
-    # NSS – evaluate at fixation locations (pixels > 0.5 after normalising target)
-    target_norm = _normalise(target)
-    fix_mask = (target_norm > 0.5).float()
-    pred_z = pred.view(b, -1)
-    pred_z = (pred_z - pred_z.mean(dim=1, keepdim=True)) / (pred_z.std(dim=1, keepdim=True) + _EPS)
-    pred_z = pred_z.view_as(pred)
-    nss_per = (pred_z * fix_mask).sum(dim=[1, 2, 3]) / (fix_mask.sum(dim=[1, 2, 3]) + _EPS)
-    nss = nss_per.mean().item()
+    # AUC-Judd – per-image, averaged over batch
+    target_np = target.cpu().numpy()  # (B, 1, H, W)
+    pred_np = pred.cpu().numpy()  # (B, 1, H, W)
 
-    return {"metric/kl": kl, "metric/cc": cc, "metric/nss": nss}
+    auc_per = []
+    for i in range(b):
+        sal = pred_np[i, 0]  # (H, W)
+        fix = target_np[i, 0]  # (H, W)
+
+        # 1. Normalise saliency map to [0, 1]
+        s_min, s_max = sal.min(), sal.max()
+        if s_max - s_min > 0:
+            sal = (sal - s_min) / (s_max - s_min)
+        else:
+            auc_per.append(0.5)
+            continue
+
+        # 2. Saliency values at fixation locations and all pixels
+        fix_sal = sal[fix > 0]
+        if len(fix_sal) == 0:
+            continue
+        all_sal = sal.ravel()
+        num_fix = len(fix_sal)
+        num_pix = len(all_sal)
+
+        # 3. Vectorised ROC curve via searchsorted – O(N log N) instead of O(Nfix * N)
+        thresholds = np.sort(fix_sal)[::-1]  # descending
+        all_sal_sorted = np.sort(all_sal)  # ascending, for searchsorted
+
+        # Number of all pixels >= each threshold = N - first index where all_sal >= thresh
+        above_counts = num_pix - np.searchsorted(all_sal_sorted, thresholds, side="left")
+
+        j = np.arange(1, num_fix + 1, dtype=np.float64)
+        tpr = np.concatenate([[0.0], j / num_fix, [1.0]])
+        fpr = np.concatenate([[0.0], above_counts / num_pix, [1.0]])
+        auc_per.append(float(np.trapezoid(tpr, fpr)))
+
+    auc_judd = float(sum(auc_per) / len(auc_per)) if auc_per else 0.0
+
+    return {"metric/kl": kl, "metric/cc": cc, "metric/auc_judd": auc_judd}

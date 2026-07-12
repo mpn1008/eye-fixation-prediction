@@ -7,7 +7,13 @@ Given a scene image (RGB), predict a fixation density map (grayscale) where pixe
 This is a **dense prediction** task: every output pixel needs a value, at the same spatial resolution as the input.
  
 ---
- 
+
+## My first thoughts of the task:
+
+Given the training data, it is quite clear that I have to implement a pre-trained net because there are only about 3000 data points.
+
+
+
 ## Why CNN (not a Transformer)?
  
 Eye fixation prediction benefits from two properties that CNNs provide by design:
@@ -41,7 +47,6 @@ A plain encoder progressively shrinks spatial resolution (224 → 7). Reconstruc
 | **ImageNet pretraining** | The encoder already recognises faces, objects, text — the exact things humans fixate on |
 | **Four residual stages** | Maps cleanly to four decoder blocks with skip connections |
 | **Stability** | Well-studied, no training instability, easy to fine-tune |
-| **Hardware fit** | Full ResNet-50 U-Net at batch 16 comfortably fits within 16 GB VRAM |
  
 ---
  
@@ -75,7 +80,6 @@ This combination is the de-facto standard used in published saliency benchmarks 
 |---|---|
 | Plain encoder + bilinear upsample | Loses spatial detail; produces blurry maps |
 | Encoder-only with FC head | Ignores spatial structure entirely |
-| GAN-based saliency | Training instability with 3k samples; overkill |
 | Transformer (ViT / TranSalNet) | Needs significantly more data; marginal gain at this dataset scale |
 | Separate branches for low/high freq | Added complexity with no clear benefit over skip connections |
  
