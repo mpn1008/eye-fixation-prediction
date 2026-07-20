@@ -12,6 +12,8 @@ This is a **dense prediction** task: every output pixel needs a value, at the sa
 
 Given the training data, it is quite clear that I have to implement a pre-trained net because there are only about 3000 data points.
 
+I tried both ResNet50 and ResNet101 as the encoder. ResNet101 gives slightly better validation result (ResNet50: 0.8146, ResNet101: 0.8192) but the convergence time is higher for ResNet101 (around epoch 25), ResNet50 converges around epoch 15.
+
 
 
 ## Why CNN (not a Transformer)?
